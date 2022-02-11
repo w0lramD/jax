@@ -98,15 +98,9 @@ _dtype = partial(dtypes.dtype, canonicalize=True)
 AxisName = Any
 
 # These TypeVars are used below to express the fact that function types
-# (i.e. call signatures) are invariant under the jit, vmap, and pmap
-# transformations.
-# Note that the function type annotations will generally not strictly hold
-# in JIT internals, as Tracer values are passed through the function.
-# Should this raise any type errors for the tracing code in future, we can disable
-# type checking in parts of the tracing code, or remove these annotations.
+# (i.e. call signatures) are invariant under the vmap transformation.
 F = TypeVar("F", bound=Callable)
 T = TypeVar("T")
-U = TypeVar("U")
 
 map, unsafe_map = safe_map, map
 zip, unsafe_zip = safe_zip, zip
@@ -225,7 +219,7 @@ def _infer_argnums_and_argnames(
 
 
 def jit(
-  fun: F,
+  fun: Callable,
   *,
   static_argnums: Union[int, Iterable[int], None] = None,
   static_argnames: Union[str, Iterable[str], None] = None,
@@ -233,7 +227,7 @@ def jit(
   backend: Optional[str] = None,
   donate_argnums: Union[int, Iterable[int]] = (),
   inline: bool = False,
-) -> F:
+) -> Any:
   """Sets up ``fun`` for just-in-time compilation with XLA.
 
   Args:
@@ -337,7 +331,7 @@ def _prepare_jit(fun, static_argnums, static_argnames, donate_argnums,
 
 
 def _python_jit(
-    fun: F,
+    fun: Callable,
     static_argnums: Union[int, Iterable[int], None] = None,
     static_argnames: Union[str, Iterable[str], None] = None,
     device: Optional[xc.Device] = None,
@@ -389,14 +383,14 @@ class _FastpathData(NamedTuple):
 _cpp_jit_cache = jax_jit.CompiledFunctionCache()
 
 def _cpp_jit(
-    fun: F,
+    fun: Callable,
     static_argnums: Union[int, Iterable[int], None] = None,
     static_argnames: Union[str, Iterable[str], None] = None,
     device: Optional[xc.Device] = None,
     backend: Optional[str] = None,
     donate_argnums: Union[int, Iterable[int]] = (),
     inline: bool = False,
-) -> F:
+) -> Any:
   # An implementation of `jit` that tries to do as much as possible in C++.
   # The goal of this function is to speed up the time it takes to process the
   # arguments, find the correct C++ executable, start the transfer of arguments
@@ -1617,7 +1611,7 @@ def _mapped_axis_size(tree, vals, dims, name, *, kws=False):
       raise ValueError(msg.format(f"the tree of axis sizes is:\n{sizes}")) from None
 
 def pmap(
-  fun: F,
+  fun: Callable,
   axis_name: Optional[AxisName] = None,
   *,
   in_axes=0,
@@ -1628,7 +1622,7 @@ def pmap(
   axis_size: Optional[int] = None,
   donate_argnums: Union[int, Iterable[int]] = (),
   global_arg_shapes: Optional[Tuple[Tuple[int, ...], ...]] = None,
-) -> F:
+) -> Any:
   """Parallel map with support for collective operations.
 
   The purpose of :py:func:`pmap` is to express single-program multiple-data
@@ -1954,7 +1948,7 @@ def _prepare_pmap(fun, in_axes, out_axes, static_broadcasted_tuple,
 
 def _get_f_mapped(
     *,
-    fun: F,
+    fun: Callable,
     axis_name: Optional[AxisName],
     in_axes=0,
     out_axes=0,
@@ -2003,7 +1997,7 @@ def _shared_code_pmap(fun, axis_name, static_broadcasted_argnums,
 
 
 def _python_pmap(
-    fun: F,
+    fun: Callable,
     axis_name: Optional[AxisName] = None,
     *,
     in_axes=0,
@@ -2014,7 +2008,7 @@ def _python_pmap(
     axis_size: Optional[int] = None,
     donate_argnums: Union[int, Iterable[int]] = (),
     global_arg_shapes: Optional[Tuple[Tuple[int, ...], ...]] = None,
-) -> F:
+) -> Any:
   """The Python only implementation."""
   axis_name, static_broadcasted_tuple, donate_tuple = _shared_code_pmap(
       fun, axis_name, static_broadcasted_argnums, donate_argnums, in_axes,
@@ -2062,7 +2056,7 @@ class _PmapFastpathData(NamedTuple):
 
 
 def _cpp_pmap(
-    fun: F,
+    fun: Callable,
     axis_name: Optional[AxisName] = None,
     *,
     in_axes=0,
@@ -2073,7 +2067,7 @@ def _cpp_pmap(
     axis_size: Optional[int] = None,
     donate_argnums: Union[int, Iterable[int]] = (),
     global_arg_shapes: Optional[Tuple[Tuple[int, ...], ...]] = None,
-) -> F:
+) -> Any:
   axis_name, static_broadcasted_tuple, donate_tuple = _shared_code_pmap(
       fun, axis_name, static_broadcasted_argnums, donate_argnums, in_axes,
       out_axes)
